@@ -1,0 +1,118 @@
+# FakeNewsDetector Configuration
+
+# API Server Configuration
+api:
+  host: "0.0.0.0"
+  port: 8000
+  debug: false
+  workers: 4
+  timeout: 30
+
+# Database Configuration
+database:
+  type: "postgresql"
+  host: "db"
+  port: 5432
+  name: "fakedetector"
+  user: "fakedetector"
+  # Password should be set via environment variable DB_PASSWORD
+  connect_timeout: 5
+  pool_size: 10
+
+# Analysis Configuration
+analysis:
+  # Statistical Analysis Settings
+  statistical:
+    enabled: true
+    readability_algorithms: ["flesch_kincaid", "coleman_liau"]
+    minimum_text_length: 100
+    fact_opinion_ratio_weight: 0.3
+    readability_weight: 0.2
+    word_frequency_weight: 0.5
+
+  # Linguistic Analysis Settings
+  linguistic:
+    enabled: true
+    sentiment_analysis: true
+    emotional_markers_detection: true
+    manipulative_constructs_detection: true
+    sentiment_weight: 0.3
+    emotional_markers_weight: 0.3
+    manipulative_constructs_weight: 0.4
+
+  # Semantic Analysis Settings
+  semantic:
+    enabled: true
+    contradiction_detection: true
+    coherence_analysis: true
+    key_themes_extraction: true
+    model_name: "ru_core_news_lg"  # spaCy model
+    contradictions_weight: 0.4
+    coherence_weight: 0.3
+    key_themes_weight: 0.3
+
+  # Structural Analysis Settings
+  structural:
+    enabled: true
+    journalism_standards_checking: true
+    structure_quality_analysis: true
+    violations_detection: true
+    journalism_standards_weight: 0.4
+    structure_quality_weight: 0.4
+    violations_weight: 0.2
+
+# Fact-checking Configuration
+# factcheck:
+#   # External API Configuration
+#   apis:
+#     google_fact_check:
+#       enabled: true
+#       base_url: "https://factchecktools.googleapis.com/v1alpha1/claims:search"
+#       # API key should be set via environment variable GOOGLE_FACT_CHECK_API_KEY
+#       timeout: 10
+#
+#     claim_review:
+#       enabled: true
+#       base_url: "https://example.com/api/claimreview"
+#       timeout: 10
+#
+#   # Open Sources Search Configuration
+#   open_sources:
+#     enabled: true
+#     search_engines: ["google", "yandex"]
+#     max_results_per_query: 10
+#     timeout: 15
+
+# Visualization Configuration
+visualization:
+  charts:
+    enabled: true
+    chart_types: ["pie", "bar", "heatmap"]
+
+  heatmap:
+    enabled: true
+    colors:
+      high_risk: "#FF0000"
+      medium_risk: "#FFA500"
+      low_risk: "#FFFF00"
+      safe: "#00FF00"
+
+  reports:
+    enabled: true
+    include_source_text: true
+    include_statistical_analysis: true
+    include_linguistic_analysis: true
+    include_semantic_analysis: true
+    include_structural_analysis: true
+
+# Telegram Bot Configuration
+telegram:
+  polling_interval: 1
+  concurrent_updates: 10
+  connection_pool_size: 10
+  # Token should be set via environment variable TELEGRAM_BOT_TOKEN
+
+# Logging Configuration
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

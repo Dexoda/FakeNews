@@ -1,0 +1,40 @@
+FROM python:3.10-slim-bullseye
+
+# Устанавливаем рабочую директорию
+WORKDIR /app
+
+# Создаем пользователя без прав root
+ARG USER_ID=100001
+ARG GROUP_ID=100001
+RUN groupadd -g $GROUP_ID tester && \
+    useradd -u $USER_ID -g tester -s /bin/bash -m tester
+
+# Устанавливаем системные зависимости, включая компилятор C++
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    build-essential \
+    libpq-dev \
+    libjpeg-dev \
+    zlib1g-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Копируем файл зависимостей
+COPY requirements.txt .
+
+# Устанавливаем Python-зависимости
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Копируем код приложения
+COPY . .
+
+# Устанавливаем права на файлы
+RUN chown -R tester:tester /app
+
+# Переключаемся на пользователя tester
+USER tester
+
+# Запускаем сервер API
+CMD ["python", "app.py"]
