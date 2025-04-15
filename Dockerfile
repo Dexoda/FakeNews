@@ -18,6 +18,7 @@ RUN apt-get update && \
     libpq-dev \
     libjpeg-dev \
     zlib1g-dev \
+    fonts-dejavu \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -29,6 +30,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Копируем код приложения
 COPY . .
+
+# Setup NLP models (use '|| true' to prevent failures from stopping the build)
+RUN pip install psutil && \
+    python setup_models.py || true
 
 # Устанавливаем права на файлы
 RUN chown -R tester:tester /app

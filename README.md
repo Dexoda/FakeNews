@@ -19,7 +19,20 @@ FakeNewsDetector is a comprehensive system that performs multi-level linguistic 
 
 - Docker and Docker Compose
 - Internet access for external API calls
-- Telegram Bot Token
+- Telegram Bot Token (required)
+- Google Fact Check API Key (optional but recommended)
+
+## Important Notes and Limitations
+
+1. **API Keys**: For full functionality, you need to obtain the following API keys:
+   - Telegram Bot Token (required): Get from [@BotFather](https://t.me/BotFather)
+   - Google Fact Check API Key (optional): Get from [Google Cloud Console](https://console.cloud.google.com/)
+
+2. **Simulated Features**: 
+   - The open source search functionality is currently simulated for demonstration purposes and doesn't actually perform real searches.
+   - ClaimReview API integration is also simulated.
+
+3. **NLP Models**: On first startup, the system will download necessary NLP models which might take some time. Alternatively, you can run `setup_models.py` before starting the containers.
 
 ## Environment Variables
 
@@ -52,7 +65,7 @@ The system uses the following environment variables (defined in `.env` file):
 2. Create and configure the environment variables file:
    ```bash
    cp .env.example .env
-   # Edit .env with your configuration
+   # Edit .env with your configuration, especially the TELEGRAM_BOT_TOKEN
    ```
 
 3. Create and configure the configuration file:
@@ -66,17 +79,22 @@ The system uses the following environment variables (defined in `.env` file):
    - Create a new bot with `/newbot` command
    - Copy the token to your `.env` file
 
-5. Build and start the containers:
+5. (Optional) Get a Google Fact Check API Key:
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project and enable the Fact Check Tools API
+   - Create an API key and copy it to your `.env` file
+
+6. Build and start the containers:
    ```bash
    docker-compose up -d
    ```
 
-6. Check if the services are running:
+7. Check if the services are running:
    ```bash
    docker-compose ps
    ```
 
-7. View the logs:
+8. View the logs:
    ```bash
    docker-compose logs -f
    ```
@@ -113,6 +131,8 @@ fakenewsdetector/
 ├── docker-compose.yml     # Docker Compose configuration
 ├── config.yml             # Application configuration
 ├── .env                   # Environment variables
+├── .env.example           # Example environment variables file
+├── setup_models.py        # Script to download NLP models
 ├── requirements.txt       # Python dependencies
 └── README.md              # This documentation
 ```
@@ -120,7 +140,7 @@ fakenewsdetector/
 ## Technical Stack
 
 - **Backend**: Python with FastAPI
-- **Linguistic Analysis**: NLTK, spaCy, TensorFlow/PyTorch
+- **Linguistic Analysis**: NLTK, spaCy, Dostoevsky (for Russian sentiment analysis)
 - **Visualization**: Matplotlib, Seaborn
 - **Telegram Bot**: python-telegram-bot
 - **Database**: PostgreSQL
@@ -153,13 +173,23 @@ To add new functionality or fix issues:
 ### Common Issues
 
 - **Bot not responding**: Check if the Telegram token is correct and the bot container is running
-- **Analysis taking too long**: Check the server logs for potential issues with external API calls
+- **Analysis taking too long**: On first run, the system needs to download NLP models which may take time
 - **Container not starting**: Check Docker logs and verify configuration files
+- **Missing NLP models**: If you encounter errors about missing models, run `setup_models.py` manually
+
+### Checking Logs
+
+```bash
+# Check logs for the API server
+docker-compose logs api-server
+
+# Check logs for the bot
+docker-compose logs bot
+
+# Check logs for the database
+docker-compose logs db
+```
 
 ## License
 
 [MIT License](LICENSE)
-# FakeNews
-# FakeNews
-# FakeNews
-# FakeNews

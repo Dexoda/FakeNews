@@ -328,7 +328,35 @@ async def check_facts(claims: List[str], config: Dict[str, Any] = None) -> List[
 
     client = FactCheckAPIClient(config)
 
+    # Check if any API is enabled but missing keys
+    google_enabled = config.get("apis", {}).get("google_fact_check", {}).get("enabled", False)
+    if google_enabled and not client.google_api_key:
+        logger.warning("Google Fact Check API включен, но ключ API отсутствует. Проверка фактов будет ограничена.")
+
+        # Add a placeholder result to inform about the limitation
+        if claims:
+            return [{
+                "claim": claims[0],
+                "status": "не проверено",
+                "sources": [],
+                "rating": 0.5,
+                "api_results": [{
+                    "api": "google_fact_check",
+                    "status": "error",
+                    "message": "API ключ не настроен. Для проверки фактов через Google API добавьте ключ в .env файл."
+                }],
+                "note": "Функциональность проверки фактов ограничена из-за отсутствия API ключей. Для полной проверки фактов настройте API ключи в .env файле."
+            }]
+
     try:
-        return await client.check_facts(claims)
+        results = await client.check_facts(claims)
+
+        # Add informational notes about simulated APIs
+        for result in results:
+            api_results = result.get("api_results", [])
+            if any(r.get("api") == "claim_review" for r in api_results):
+                result["note_claim_review"] = "Проверка через ClaimReview API является симуляцией для демонстрационных целей."
+
+        return results
     finally:
         await client.close()

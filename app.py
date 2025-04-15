@@ -33,11 +33,14 @@ async def lifespan(app: FastAPI):
     app.state.config = load_config()
 
     # Initialize database connection
-    from database import init_db
+    from database import init_db, close_db
     await init_db(app.state.config)
 
     logger.info("Server started successfully")
     yield
+
+    # Cleanup database connection on shutdown
+    await close_db()
     logger.info("Server shutting down")
 
 # Initialize FastAPI application

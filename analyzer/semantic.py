@@ -56,8 +56,8 @@ async def perform_semantic_analysis(text: str) -> Dict[str, Any]:
         # Выделение ключевых сущностей
         entities = extract_entities(doc)
 
-        # Выделение ключевых тем
-        key_themes = extract_key_themes(doc)
+        # Выделение ключевых тем (без использования noun_chunks)
+        key_themes = extract_key_themes_alt(doc)
 
         # Анализ смысловых связей и противоречий
         coherence_analysis = analyze_coherence(doc)
@@ -96,7 +96,23 @@ async def perform_semantic_analysis(text: str) -> Dict[str, Any]:
 
     except Exception as e:
         logger.error(f"Ошибка при семантическом анализе: {e}")
-        raise
+        # Возвращаем базовый результат вместо ошибки
+        return {
+            "entities": {"персоны": [], "организации": [], "локации": [], "даты": [], "другое": []},
+            "key_themes": [],
+            "coherence": {
+                "coherence_score": 0.5,
+                "logical_flow": "не определено",
+                "topic_shifts": 0,
+                "coherence_issues": []
+            },
+            "contradictions": [],
+            "contradictions_count": 0,
+            "identified_claims": [],
+            "suspicious_fragments": [],
+            "credibility_score": 0.5,
+            "error": str(e)
+        }
 
 def extract_entities(doc) -> Dict[str, List[Dict[str, Any]]]:
     """
@@ -133,41 +149,52 @@ def extract_entities(doc) -> Dict[str, List[Dict[str, Any]]]:
 
     return entities
 
-def extract_key_themes(doc) -> List[str]:
+def extract_key_themes_alt(doc) -> List[str]:
     """
-    Извлекает ключевые тематические компоненты текста.
+    Альтернативная версия извлечения ключевых тем без использования noun_chunks.
 
     Возвращает список ключевых тем.
     """
-    # Создаем словарь для подсчета частоты фраз
-    noun_chunks = {}
+    # Словарь для подсчета фраз
+    phrases = {}
 
-    # Подсчитываем именные фразы (существительное + прилагательные)
-    for chunk in doc.noun_chunks:
-        # Фильтруем стоп-слова и пунктуацию
-        words = [token.lemma_ for token in chunk if not token.is_stop and not token.is_punct]
-        if words:
-            phrase = " ".join(words)
-            noun_chunks[phrase] = noun_chunks.get(phrase, 0) + 1
+    # Находим прилагательное + существительное комбинации (типичные именные фразы)
+    i = 0
+    while i < len(doc) - 1:  # Проверяем, что есть хотя бы 2 токена впереди
+        # Ищем существительное
+        if doc[i].pos_ in ["NOUN", "PROPN"]:
+            # Если перед существительным есть прилагательное, считаем это фразой
+            if i > 0 and doc[i-1].pos_ == "ADJ":
+                phrase_tokens = [doc[i-1], doc[i]]
+                # Фильтруем стоп-слова
+                filtered_tokens = [t for t in phrase_tokens if not t.is_stop and not t.is_punct]
+                if filtered_tokens:
+                    phrase = " ".join(t.lemma_ for t in filtered_tokens)
+                    phrases[phrase] = phrases.get(phrase, 0) + 1
 
-    # Подсчитываем отдельные важные слова (существительные и глаголы)
+            # В любом случае считаем само существительное
+            if not doc[i].is_stop:
+                phrases[doc[i].lemma_] = phrases.get(doc[i].lemma_, 0) + 1
+        i += 1
+
+    # Словарь для подсчета важных слов
     important_words = {}
     for token in doc:
-        if token.pos_ in ["NOUN", "VERB"] and not token.is_stop and len(token.text) > 3:
+        if token.pos_ in ["NOUN", "VERB", "PROPN"] and not token.is_stop and len(token.text) > 3:
             word = token.lemma_
             important_words[word] = important_words.get(word, 0) + 1
 
     # Выбираем наиболее частотные фразы
-    top_phrases = sorted(noun_chunks.items(), key=lambda x: x[1], reverse=True)[:10]
+    sorted_phrases = sorted(phrases.items(), key=lambda x: x[1], reverse=True)
+    top_phrases = sorted_phrases[:10] if len(sorted_phrases) >= 10 else sorted_phrases
 
     # Выбираем наиболее частотные слова, не входящие в фразы
     top_words = []
     for word, count in sorted(important_words.items(), key=lambda x: x[1], reverse=True):
-        if any(word in phrase for phrase, _ in top_phrases):
-            continue
-        top_words.append((word, count))
-        if len(top_words) >= 5:
-            break
+        if all(word not in phrase for phrase, _ in top_phrases):
+            top_words.append((word, count))
+            if len(top_words) >= 5:
+                break
 
     # Объединяем результаты
     key_themes = [phrase for phrase, _ in top_phrases] + [word for word, _ in top_words]

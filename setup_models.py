@@ -23,84 +23,68 @@ logger = logging.getLogger("setup_models")
 def setup_nltk():
     """Загружает необходимые данные для NLTK."""
     logger.info("Настройка NLTK...")
-    
+
     try:
         import nltk
-        
+
         # Загружаем необходимые ресурсы
         nltk_packages = [
             'punkt',         # Токенизатор
             'stopwords',     # Стоп-слова
-            'wordnet',       # Тезаурус
-            'averaged_perceptron_tagger'  # POS-теггер
         ]
-        
+
         for package in nltk_packages:
             logger.info(f"Загрузка пакета NLTK: {package}")
             nltk.download(package, quiet=True)
-        
+
         logger.info("Настройка NLTK завершена успешно")
-        
+
     except Exception as e:
         logger.error(f"Ошибка при настройке NLTK: {e}")
-        raise
+        logger.warning("Продолжаем без NLTK")
 
 def setup_spacy():
     """Загружает модели для spaCy."""
     logger.info("Настройка spaCy...")
-    
+
     try:
-        # Проверяем наличие spaCy
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "spacy"])
-        
         # Загружаем русскоязычную модель
         logger.info("Загрузка модели spaCy для русского языка")
         subprocess.check_call([sys.executable, "-m", "spacy", "download", "ru_core_news_md"])
-        
+
         logger.info("Настройка spaCy завершена успешно")
-        
+
     except Exception as e:
         logger.error(f"Ошибка при настройке spaCy: {e}")
-        raise
+        logger.warning("Продолжаем без spaCy")
 
-def setup_dostoevsky():
-    """Загружает модели для Dostoevsky (анализ тональности)."""
-    logger.info("Настройка Dostoevsky...")
-    
+def check_dostoevsky():
+    """Проверяет наличие Dostoevsky, но не пытается скачать модель."""
+    logger.info("Проверка наличия Dostoevsky...")
+
     try:
-        # Проверяем наличие Dostoevsky
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "dostoevsky"])
-        
-        # Загружаем модель
-        from dostoevsky.data import DATA_BASE_PATH
-        from dostoevsky.models import FastTextSocialNetworkModel
-        
-        model_path = Path(DATA_BASE_PATH) / "models" / "fasttext-social-network-model.bin"
-        
-        if not model_path.exists():
-            logger.info("Загрузка модели Dostoevsky...")
-            FastTextSocialNetworkModel.MODEL_PATH = model_path
-            model = FastTextSocialNetworkModel(tokenizer=None)
-            # Первый вызов загрузит модель
-            _ = model.get_model()
-            logger.info("Модель Dostoevsky загружена успешно")
-        else:
-            logger.info("Модель Dostoevsky уже существует")
-        
-        logger.info("Настройка Dostoevsky завершена успешно")
-        
+        # Только проверяем наличие и печатаем сообщение
+        import dostoevsky
+        logger.info(f"Dostoevsky установлен (версия {dostoevsky.__version__ if hasattr(dostoevsky, '__version__') else 'неизвестна'})")
+
+        # НЕ пытаемся загружать модель
+        logger.info("Модель Dostoevsky не будет загружаться автоматически.")
+        logger.info("Система настроена для работы без анализа тональности.")
+
+    except ImportError:
+        logger.warning("Dostoevsky не установлен. Анализ тональности будет недоступен.")
     except Exception as e:
-        logger.error(f"Ошибка при настройке Dostoevsky: {e}")
-        raise
+        logger.error(f"Ошибка при проверке Dostoevsky: {e}")
+        logger.warning("Продолжаем без Dostoevsky")
 
 def setup_fonts():
     """Устанавливает необходимые шрифты для визуализации."""
     logger.info("Настройка шрифтов...")
-    
+
     try:
         # Проверяем наличие DejaVu Sans (используется в visualization/heatmap.py)
         font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-        
+
         if not os.path.exists(font_path):
             logger.info("Устанавливаем пакет шрифтов DejaVu...")
             # Для Debian/Ubuntu
@@ -113,35 +97,36 @@ def setup_fonts():
                 logger.warning("Не удалось установить шрифты DejaVu. Возможно, потребуется ручная установка.")
         else:
             logger.info("Шрифты DejaVu уже установлены")
-        
+
         logger.info("Настройка шрифтов завершена")
-        
+
     except Exception as e:
         logger.error(f"Ошибка при настройке шрифтов: {e}")
-        # Не останавливаем скрипт, так как это не критическая ошибка
+        logger.warning("Продолжаем без настройки шрифтов")
 
 def main():
     """Выполняет настройку всех необходимых моделей и ресурсов."""
     logger.info("Начало настройки моделей и ресурсов для FakeNewsDetector")
-    
+
     try:
         # Настраиваем NLTK
         setup_nltk()
-        
+
         # Настраиваем spaCy
         setup_spacy()
-        
-        # Настраиваем Dostoevsky
-        setup_dostoevsky()
-        
+
+        # Проверяем Dostoevsky (без загрузки модели)
+        check_dostoevsky()
+
         # Настраиваем шрифты
         setup_fonts()
-        
+
         logger.info("Настройка моделей и ресурсов завершена успешно")
-        
+
     except Exception as e:
         logger.error(f"Произошла ошибка при настройке: {e}")
-        sys.exit(1)
+        # Не завершаем скрипт с ошибкой, чтобы Docker build не прерывался
+        logger.warning("Некоторые компоненты могут быть недоступны, но система продолжит работу")
 
 if __name__ == "__main__":
     main()

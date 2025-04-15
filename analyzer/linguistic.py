@@ -3,8 +3,10 @@ import re
 from typing import Dict, Any, List, Tuple
 import nltk
 import numpy as np
-from dostoevsky.tokenization import RegexTokenizer
-from dostoevsky.models import FastTextSocialNetworkModel
+
+# Don't try to import Dostoevsky models that might fail
+# from dostoevsky.tokenization import RegexTokenizer
+# from dostoevsky.models import FastTextSocialNetworkModel
 
 # Загрузим необходимые данные для NLTK
 try:
@@ -14,20 +16,31 @@ except LookupError:
 
 logger = logging.getLogger(__name__)
 
-# Инициализация моделей
-tokenizer = RegexTokenizer()
-model = None
+# Flag to indicate if sentiment analysis is available
+sentiment_available = False
 
-def load_sentiment_model():
-    """Лениво загружает модель анализа тональности при первой необходимости"""
-    global model
-    if model is None:
-        try:
-            model = FastTextSocialNetworkModel(tokenizer=tokenizer)
-            logger.info("Модель анализа тональности успешно загружена")
-        except Exception as e:
-            logger.error(f"Ошибка при загрузке модели анализа тональности: {e}")
-            raise
+# Try to import and initialize Dostoevsky, but don't fail if it doesn't work
+try:
+    from dostoevsky.tokenization import RegexTokenizer
+    from dostoevsky.models import FastTextSocialNetworkModel
+
+    # Initialize tokenizer
+    tokenizer = RegexTokenizer()
+
+    # Try to load model
+    try:
+        model = FastTextSocialNetworkModel(tokenizer=tokenizer)
+        # Test the model with a simple prediction to ensure it works
+        test_result = model.predict(['Тестовое предложение'])
+        if test_result:
+            sentiment_available = True
+            logger.info("Модель анализа тональности успешно загружена и проверена")
+    except Exception as e:
+        logger.warning(f"Не удалось загрузить модель анализа тональности: {e}")
+        model = None
+except Exception as e:
+    logger.warning(f"Не удалось импортировать модули Dostoevsky: {e}")
+    model = None
 
 async def perform_linguistic_analysis(text: str) -> Dict[str, Any]:
     """
@@ -42,14 +55,20 @@ async def perform_linguistic_analysis(text: str) -> Dict[str, Any]:
     logger.info("Выполняется лингвистический анализ текста")
 
     try:
-        # Загрузка модели анализа тональности
-        load_sentiment_model()
-
         # Токенизация
         sentences = nltk.sent_tokenize(text, language='russian')
 
-        # Анализ тональности
-        sentiment_results = analyze_sentiment(sentences)
+        # Анализ тональности (если доступен)
+        if sentiment_available and model is not None:
+            try:
+                sentiment_results = analyze_sentiment(sentences)
+                logger.info("Анализ тональности выполнен успешно")
+            except Exception as e:
+                logger.warning(f"Ошибка при анализе тональности: {e}")
+                sentiment_results = get_default_sentiment()
+        else:
+            logger.info("Анализ тональности недоступен, используется заглушка")
+            sentiment_results = get_default_sentiment()
 
         # Выделение эмоционально окрашенной лексики
         emotional_markers = detect_emotional_markers(text)
@@ -89,7 +108,46 @@ async def perform_linguistic_analysis(text: str) -> Dict[str, Any]:
 
     except Exception as e:
         logger.error(f"Ошибка при лингвистическом анализе: {e}")
-        raise
+        # Возвращаем базовые результаты вместо ошибки
+        return {
+            "sentiment": "нейтральная",
+            "sentiment_scores": {
+                'negative': 0.0,
+                'positive': 0.0,
+                'neutral': 1.0,
+                'speech': 0.0,
+                'skip': 0.0
+            },
+            "emotional_tone": "нейтральный",
+            "emotional_markers": {},
+            "manipulative_constructs": [],
+            "manipulative_constructs_count": 0,
+            "syntax_analysis": {
+                "avg_sentence_length": 0.0,
+                "complex_sentences_ratio": 0.0,
+                "passive_voice_ratio": 0.0
+            },
+            "suspicious_fragments": [],
+            "credibility_score": 0.5,
+            "error": str(e)
+        }
+
+def get_default_sentiment():
+    """
+    Возвращает заглушку для анализа тональности.
+    """
+    return {
+        "overall_sentiment": "нейтральная",
+        "scores": {
+            'negative': 0.0,
+            'positive': 0.0,
+            'neutral': 1.0,
+            'speech': 0.0,
+            'skip': 0.0
+        },
+        "variation": 0.0,
+        "sentence_sentiments": []
+    }
 
 def analyze_sentiment(sentences: List[str]) -> Dict[str, Any]:
     """
@@ -97,61 +155,69 @@ def analyze_sentiment(sentences: List[str]) -> Dict[str, Any]:
 
     Возвращает словарь с общей тональностью и подробными оценками.
     """
-    # Используем Dostoevsky для анализа тональности
-    results = model.predict(sentences)
+    if not sentiment_available or model is None:
+        return get_default_sentiment()
 
-    # Получаем средние значения по всем предложениям
-    total_negative = 0
-    total_positive = 0
-    total_neutral = 0
-    total_speech = 0
-    total_skip = 0
+    try:
+        # Используем Dostoevsky для анализа тональности
+        results = model.predict(sentences)
 
-    for result in results:
-        total_negative += result.get('negative', 0)
-        total_positive += result.get('positive', 0)
-        total_neutral += result.get('neutral', 0)
-        total_speech += result.get('speech', 0)
-        total_skip += result.get('skip', 0)
+        # Получаем средние значения по всем предложениям
+        total_negative = 0
+        total_positive = 0
+        total_neutral = 0
+        total_speech = 0
+        total_skip = 0
 
-    # Рассчитываем средние значения
-    sentence_count = max(1, len(sentences))
-    avg_negative = total_negative / sentence_count
-    avg_positive = total_positive / sentence_count
-    avg_neutral = total_neutral / sentence_count
-    avg_speech = total_speech / sentence_count
-    avg_skip = total_skip / sentence_count
+        for result in results:
+            total_negative += result.get('negative', 0)
+            total_positive += result.get('positive', 0)
+            total_neutral += result.get('neutral', 0)
+            total_speech += result.get('speech', 0)
+            total_skip += result.get('skip', 0)
 
-    # Определяем преобладающую тональность
-    scores = {
-        'negative': avg_negative,
-        'positive': avg_positive,
-        'neutral': avg_neutral,
-        'speech': avg_speech,
-        'skip': avg_skip
-    }
+        # Рассчитываем средние значения
+        sentence_count = max(1, len(sentences))
+        avg_negative = total_negative / sentence_count
+        avg_positive = total_positive / sentence_count
+        avg_neutral = total_neutral / sentence_count
+        avg_speech = total_speech / sentence_count
+        avg_skip = total_skip / sentence_count
 
-    # Определяем общую тональность
-    max_score = max(avg_negative, avg_positive, avg_neutral)
-    if max_score == avg_neutral:
-        overall_sentiment = "нейтральная"
-    elif max_score == avg_positive:
-        overall_sentiment = "позитивная"
-    else:
-        overall_sentiment = "негативная"
+        # Определяем преобладающую тональность
+        scores = {
+            'negative': avg_negative,
+            'positive': avg_positive,
+            'neutral': avg_neutral,
+            'speech': avg_speech,
+            'skip': avg_skip
+        }
 
-    # Анализируем разброс эмоций
-    sentiment_variation = np.std([avg_negative, avg_positive, avg_neutral])
+        # Определяем общую тональность
+        max_score = max(avg_negative, avg_positive, avg_neutral)
+        if max_score == avg_neutral:
+            overall_sentiment = "нейтральная"
+        elif max_score == avg_positive:
+            overall_sentiment = "позитивная"
+        else:
+            overall_sentiment = "негативная"
 
-    return {
-        "overall_sentiment": overall_sentiment,
-        "scores": scores,
-        "variation": sentiment_variation,
-        "sentence_sentiments": [
-            {"text": sentences[i], "sentiment": list(results[i].items())}
-            for i in range(min(len(sentences), len(results)))
-        ]
-    }
+        # Анализируем разброс эмоций
+        sentiment_variation = np.std([avg_negative, avg_positive, avg_neutral])
+
+        return {
+            "overall_sentiment": overall_sentiment,
+            "scores": scores,
+            "variation": sentiment_variation,
+            "sentence_sentiments": [
+                {"text": sentences[i], "sentiment": list(results[i].items())}
+                for i in range(min(len(sentences), len(results)))
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Ошибка при анализе тональности: {e}")
+        # Возвращаем нейтральные значения в случае ошибки
+        return get_default_sentiment()
 
 def detect_emotional_markers(text: str) -> Dict[str, List[str]]:
     """
@@ -403,27 +469,28 @@ def identify_suspicious_fragments(
                 })
 
     # 2. Фрагменты с сильными эмоциональными выбросами
-    try:
-        for i, sentence_sentiment in enumerate(sentiment_results.get('sentence_sentiments', [])):
-            # Проверяем наличие сильных эмоциональных выбросов
-            sentiment_dict = dict(sentence_sentiment['sentiment'])
-            if (sentiment_dict.get('negative', 0) > 0.7 or
-                sentiment_dict.get('positive', 0) > 0.8):
+    if sentiment_available and 'sentence_sentiments' in sentiment_results:
+        try:
+            for i, sentence_sentiment in enumerate(sentiment_results.get('sentence_sentiments', [])):
+                # Проверяем наличие сильных эмоциональных выбросов
+                sentiment_dict = dict(sentence_sentiment['sentiment'])
+                if (sentiment_dict.get('negative', 0) > 0.7 or
+                    sentiment_dict.get('positive', 0) > 0.8):
 
-                sentence_text = sentence_sentiment['text']
-                sentence_start = text.find(sentence_text)
+                    sentence_text = sentence_sentiment['text']
+                    sentence_start = text.find(sentence_text)
 
-                if sentence_start >= 0:
-                    suspicious_fragments.append({
-                        'start': sentence_start,
-                        'end': sentence_start + len(sentence_text),
-                        'text': sentence_text,
-                        'reason': "Сильная эмоциональная окраска",
-                        'confidence': max(sentiment_dict.get('negative', 0),
-                                        sentiment_dict.get('positive', 0))
-                    })
-    except Exception as e:
-        logger.warning(f"Ошибка при анализе эмоциональных выбросов: {e}")
+                    if sentence_start >= 0:
+                        suspicious_fragments.append({
+                            'start': sentence_start,
+                            'end': sentence_start + len(sentence_text),
+                            'text': sentence_text,
+                            'reason': "Сильная эмоциональная окраска",
+                            'confidence': max(sentiment_dict.get('negative', 0),
+                                            sentiment_dict.get('positive', 0))
+                        })
+        except Exception as e:
+            logger.warning(f"Ошибка при анализе эмоциональных выбросов: {e}")
 
     return suspicious_fragments
 

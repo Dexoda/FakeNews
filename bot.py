@@ -5,6 +5,7 @@ import yaml
 import aiohttp
 import io
 import asyncio
+import re
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
@@ -81,16 +82,72 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
+async def fetch_url_content(url: str) -> str:
+    """
+    Fetches and extracts text content from a URL.
+
+    Args:
+        url: The URL to fetch
+
+    Returns:
+        Extracted text content
+    """
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=10) as response:
+                if response.status != 200:
+                    return f"Не удалось получить содержимое по URL (код ответа: {response.status})"
+
+                content_type = response.headers.get('Content-Type', '')
+
+                # Handle HTML content
+                if 'text/html' in content_type:
+                    html_content = await response.text()
+
+                    # Simple HTML text extraction (in a real system would use proper HTML parsing)
+                    # Remove HTML tags
+                    text = re.sub(r'<[^>]+>', ' ', html_content)
+                    # Remove extra whitespace
+                    text = re.sub(r'\s+', ' ', text).strip()
+
+                    if len(text) > 4000:  # Trim if too long
+                        text = text[:4000] + "... (текст обрезан)"
+
+                    return text
+
+                # Handle plain text
+                elif 'text/plain' in content_type:
+                    return await response.text()
+
+                # Unsupported content type
+                else:
+                    return f"Неподдерживаемый тип контента: {content_type}"
+
+    except asyncio.TimeoutError:
+        return "Время ожидания ответа от сервера истекло"
+    except Exception as e:
+        return f"Ошибка при получении содержимого URL: {str(e)}"
+
 async def analyze_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Analyze the news text sent by the user."""
     message = update.message.text
 
     # Check if it's a URL
     url = None
+    extracted_text = message
+
     if message.startswith(("http://", "https://")):
         url = message
         progress_message = await update.message.reply_text(
-            "🔍 Получена ссылка. Начинаю анализ..."
+            "🔍 Получена ссылка. Извлекаю текст..."
+        )
+
+        # Extract text from URL
+        extracted_text = await fetch_url_content(url)
+
+        # Update progress message
+        await progress_message.edit_text(
+            "🔍 Текст извлечен. Начинаю анализ..."
         )
     else:
         progress_message = await update.message.reply_text(
@@ -106,12 +163,7 @@ async def analyze_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Send request to API
         api_client = context.bot_data["api_client"]
-        if url:
-            # For URLs, we'd extract text and then analyze
-            # This is simplified here
-            analysis_result = await api_client.analyze_news("", url)
-        else:
-            analysis_result = await api_client.analyze_news(message)
+        analysis_result = await api_client.analyze_news(extracted_text, url)
 
         # Update progress
         await progress_message.edit_text("⏳ Проверяю факты... (2/4)")
@@ -291,12 +343,11 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Log errors caused by updates."""
     logger.error(f"Update {update} caused error {context.error}")
 
-async def shutdown(application):
+async def shutdown(context: ContextTypes.DEFAULT_TYPE):
     """Shut down the bot gracefully"""
     logger.info("Shutting down bot...")
-    if "api_client" in application.bot_data:
-        await application.bot_data["api_client"].close()
-
+    if "api_client" in context.application.bot_data:
+        await context.application.bot_data["api_client"].close()
 def main():
     """Start the bot."""
     # Load configuration
@@ -329,8 +380,54 @@ def main():
     # Add error handler
     application.add_error_handler(error_handler)
 
-    # Закомментируем эту строку, которая вызывает ошибку:
-    # application.add_shutdown_callback(shutdown)
+    # Register shutdown handler - Using a different approach
+    try:
+        # Check if post_shutdown exists and is not None
+        if hasattr(application, 'post_shutdown') and application.post_shutdown is not None:
+            application.post_shutdown.append(shutdown)
+        else:
+            # Alternative approach - just log the shutdown procedure
+            logger.info("Shutdown callback registration not available, will rely on automatic cleanup")
+    except Exception as e:
+        logger.warning(f"Could not register shutdown handler: {e}")
+        logger.info("Continuing without explicit shutdown handler")
+
+    # Start the Bot
+    logger.info("Starting bot polling...")
+    application.run_polling(stop_signals=None)  # Add stop_signals=None to prevent keyboard interrupt issues
+    """Start the bot."""
+    # Load configuration
+    config = load_config()
+
+    # Create API client
+    api_url = config.get("api", {}).get("url", "http://api-server:8000")
+    api_client = APIClient(api_url)
+
+    # Get bot token from environment
+    token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    if not token:
+        logger.error("TELEGRAM_BOT_TOKEN not set in environment")
+        sys.exit(1)
+
+    # Create application and add handlers
+    application = Application.builder().token(token).build()
+    application.bot_data["api_client"] = api_client
+
+    # Add command handlers
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", help_command))
+
+    # Add message handler
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, analyze_text))
+
+    # Add callback query handler
+    application.add_handler(CallbackQueryHandler(button_handler))
+
+    # Add error handler
+    application.add_error_handler(error_handler)
+
+    # Register shutdown handler - FIX: Use the correct method for shutdown
+    application.post_shutdown.append(shutdown)
 
     # Start the Bot
     logger.info("Starting bot polling...")
