@@ -11,10 +11,10 @@ api:
 # Database Configuration
 database:
   type: "postgresql"
-  host: "db"
+  host: "fakenews-db"
   port: 5432
-  name: "fakedetector"
-  user: "fakedetector"
+  name: "fakenews"
+  user: "postgres"
   # Password should be set via environment variable DB_PASSWORD
   connect_timeout: 5
   pool_size: 10

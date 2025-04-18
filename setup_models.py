@@ -50,7 +50,7 @@ def setup_spacy():
     try:
         # Загружаем русскоязычную модель
         logger.info("Загрузка модели spaCy для русского языка")
-        subprocess.check_call([sys.executable, "-m", "spacy", "download", "ru_core_news_md"])
+        subprocess.check_call([sys.executable, "-m", "spacy", "download", "ru_core_news_lg"])
 
         logger.info("Настройка spaCy завершена успешно")
 

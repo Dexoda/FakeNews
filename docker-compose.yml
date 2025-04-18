@@ -1,10 +1,29 @@
 version: '3.8'
 
 services:
+  # 1. PostgreSQL
+  db:
+    image: postgres:14-alpine
+    container_name: fakenews-db
+    restart: always
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER:    ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB:      ${DB_NAME}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 2. FastAPI‑сервис
   api-server:
     build:
       context: .
       dockerfile: Dockerfile
+    container_name: api-server
     restart: always
     ports:
       - "8000:8000"
@@ -13,49 +32,41 @@ services:
     env_file:
       - .env
     environment:
-      - USER_ID=${USER_ID:-100001}
-      - GROUP_ID=${GROUP_ID:-100001}
-      - TZ=${TZ:-Europe/Moscow}
+      # передаем юзер/группу и часовой пояс внутрь контейнера
+      - USER_ID=${USER_ID}
+      - GROUP_ID=${GROUP_ID}
+      - TZ=${TZ}
+    depends_on:
+      db:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import psutil; health = True; health = health and psutil.cpu_percent(interval=1) < 95; health = health and psutil.virtual_memory().percent < 95; health = health and psutil.disk_usage('/').percent < 95; health = health and len(psutil.Process().open_files()) < 1000; print('OK' if health else 'FAIL')"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
-    depends_on:
-      - db
 
-  db:
-    image: postgres:14-alpine
-    restart: always
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_PASSWORD=${DB_PASSWORD:-fakedetector}
-      - POSTGRES_USER=${DB_USER:-fakedetector}
-      - POSTGRES_DB=${DB_NAME:-fakedetector}
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-fakedetector}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
+  # 3. Telegram‑бот
   bot:
     build:
       context: .
       dockerfile: Dockerfile.bot
+    container_name: fakenews-bot
     restart: always
     volumes:
       - ./config.yml:/app/config.yml:ro
     env_file:
       - .env
     environment:
-      - USER_ID=${USER_ID:-100001}
-      - GROUP_ID=${GROUP_ID:-100001}
-      - TZ=${TZ:-Europe/Moscow}
-    command: ["python", "bot.py"]
+      - USER_ID=${USER_ID}
+      - GROUP_ID=${GROUP_ID}
+      - TZ=${TZ}
+      # Явно указываем, куда бот шлет запросы
+      - API_SCHEME=http
+      - API_HOST=api-server
+      - API_PORT=8000
     depends_on:
-      - api-server
+      api-server:
+        condition: service_started
 
 volumes:
   postgres_data:

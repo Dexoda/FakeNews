@@ -1,8 +1,22 @@
 import logging
 import re
 from typing import Dict, Any, List, Tuple, Set
+
 import nltk
 import numpy as np
+from config import load_config
+
+# Настройка логирования
+logger = logging.getLogger(__name__)
+
+# Инициализация переменных
+nlp = None
+
+# Загрузим необходимые данные для NLTK
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt')
 
 try:
     import spacy
@@ -12,27 +26,19 @@ except ImportError:
     logging.error("Также необходимо загрузить русскую модель: python -m spacy download ru_core_news_md")
     raise
 
-# Загрузим необходимые данные для NLTK
-try:
-    nltk.data.find('tokenizers/punkt')
-except LookupError:
-    nltk.download('punkt')
-
-logger = logging.getLogger(__name__)
-
-# Инициализация модели spaCy
-nlp = None
-
 def load_spacy_model():
     """Лениво загружает модель spaCy при первой необходимости"""
     global nlp
     if nlp is None:
         try:
-            nlp = spacy.load("ru_core_news_md")
-            logger.info("Модель spaCy успешно загружена")
+            cfg = load_config()
+            model_name = cfg["analysis"]["semantic"]["model_name"]
+            nlp = spacy.load(model_name)
+            logger.info(f"Модель spaCy '{model_name}' успешно загружена")
         except Exception as e:
             logger.error(f"Ошибка при загрузке модели spaCy: {e}")
             raise
+    return nlp
 
 async def perform_semantic_analysis(text: str) -> Dict[str, Any]:
     """
@@ -48,7 +54,8 @@ async def perform_semantic_analysis(text: str) -> Dict[str, Any]:
 
     try:
         # Загрузка модели spaCy
-        load_spacy_model()
+        global nlp
+        nlp = load_spacy_model()
 
         # Обработка текста с помощью spaCy
         doc = nlp(text)
@@ -330,6 +337,11 @@ def detect_contradictions(doc, claims: List[str]) -> List[Dict[str, Any]]:
     """
     contradictions = []
 
+    # Проверка наличия загруженной модели
+    global nlp
+    if nlp is None:
+        nlp = load_spacy_model()
+
     # Преобразуем утверждения в объекты spaCy для анализа
     claim_docs = [nlp(claim) for claim in claims]
 
@@ -591,6 +603,11 @@ def has_quantity_contradiction(doc1, doc2):
     # Извлекаем числа из обоих предложений вместе с контекстом
     numbers1 = extract_numbers_with_context(doc1)
     numbers2 = extract_numbers_with_context(doc2)
+
+    # Проверка наличия загруженной модели
+    global nlp
+    if nlp is None:
+        nlp = load_spacy_model()
 
     # Если в обоих предложениях есть числа, проверяем на противоречия
     for num1, context1 in numbers1:
