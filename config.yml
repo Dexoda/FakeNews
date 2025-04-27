@@ -4,18 +4,18 @@
 api:
   host: "0.0.0.0"
   port: 8000
-  debug: false
+  debug: true
   workers: 4
   timeout: 30
 
 # Database Configuration
 database:
   type: "postgresql"
-  host: "fakenews-db"
+  host: "db"
   port: 5432
-  name: "fakenews"
-  user: "postgres"
-  # Password should be set via environment variable DB_PASSWORD
+  name: "fakedetector"
+  user: "fakedetector"
+  password: "fakedetector"
   connect_timeout: 5
   pool_size: 10
 
@@ -46,7 +46,7 @@ analysis:
     contradiction_detection: true
     coherence_analysis: true
     key_themes_extraction: true
-    model_name: "ru_core_news_lg"  # spaCy model
+    model_name: "ru_core_news_sm"
     contradictions_weight: 0.4
     coherence_weight: 0.3
     key_themes_weight: 0.3
@@ -61,58 +61,7 @@ analysis:
     structure_quality_weight: 0.4
     violations_weight: 0.2
 
-# Fact-checking Configuration
-# factcheck:
-#   # External API Configuration
-#   apis:
-#     google_fact_check:
-#       enabled: true
-#       base_url: "https://factchecktools.googleapis.com/v1alpha1/claims:search"
-#       # API key should be set via environment variable GOOGLE_FACT_CHECK_API_KEY
-#       timeout: 10
-#
-#     claim_review:
-#       enabled: true
-#       base_url: "https://example.com/api/claimreview"
-#       timeout: 10
-#
-#   # Open Sources Search Configuration
-#   open_sources:
-#     enabled: true
-#     search_engines: ["google", "yandex"]
-#     max_results_per_query: 10
-#     timeout: 15
-
-# Visualization Configuration
-visualization:
-  charts:
-    enabled: true
-    chart_types: ["pie", "bar", "heatmap"]
-
-  heatmap:
-    enabled: true
-    colors:
-      high_risk: "#FF0000"
-      medium_risk: "#FFA500"
-      low_risk: "#FFFF00"
-      safe: "#00FF00"
-
-  reports:
-    enabled: true
-    include_source_text: true
-    include_statistical_analysis: true
-    include_linguistic_analysis: true
-    include_semantic_analysis: true
-    include_structural_analysis: true
-
-# Telegram Bot Configuration
-telegram:
-  polling_interval: 1
-  concurrent_updates: 10
-  connection_pool_size: 10
-  # Token should be set via environment variable TELEGRAM_BOT_TOKEN
-
 # Logging Configuration
 logging:
-  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: "DEBUG"
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
