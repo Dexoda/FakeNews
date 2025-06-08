@@ -60,10 +60,11 @@ services:
       - USER_ID=${USER_ID}
       - GROUP_ID=${GROUP_ID}
       - TZ=${TZ}
-      # Явно указываем, куда бот шлет запросы
       - API_SCHEME=http
       - API_HOST=api-server
       - API_PORT=8000
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}  # <--- для доступа к AI
     depends_on:
       api-server:
         condition: service_started

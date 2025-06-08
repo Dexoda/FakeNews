@@ -7,22 +7,19 @@ from .linguistic import perform_linguistic_analysis
 from .semantic import perform_semantic_analysis
 from .structural import perform_structural_analysis
 
+# Импорт AI-фактчекера
+from .ai_checker import ai_fact_check
+
+import asyncio
+
 logger = logging.getLogger(__name__)
 
 async def analyze_text(text: str, url: Optional[str] = None) -> Dict[str, Any]:
     """
-    Performs a comprehensive multi-level analysis of the news text.
-
-    Args:
-        text: The news text to analyze
-        url: Optional URL source of the news
-
-    Returns:
-        Dictionary containing results from all analysis levels
+    Performs a comprehensive multi-level analysis of the news text, including AI-based fact-checking.
     """
     logger.info("Starting comprehensive text analysis")
 
-    # Initialize results
     results = {
         "statistical": {},
         "linguistic": {},
@@ -30,7 +27,8 @@ async def analyze_text(text: str, url: Optional[str] = None) -> Dict[str, Any]:
         "structural": {},
         "credibility_score": 0.5,
         "key_claims": [],
-        "suspicious_fragments": []
+        "suspicious_fragments": [],
+        "ai_fact_check": None
     }
 
     try:
@@ -113,20 +111,27 @@ async def analyze_text(text: str, url: Optional[str] = None) -> Dict[str, Any]:
             logger.error(f"Error calculating credibility score: {e}")
             results["credibility_score"] = 0.5
 
+        # Step 8: AI-фактчекер (Qwen3-235B через OpenRouter)
+        try:
+            logger.info("Performing AI-based fact checking (Qwen3-235B)")
+            # Запускать синхронно (чтобы не блокировать event loop), можно через run_in_executor
+            loop = asyncio.get_event_loop()
+            ai_result = await loop.run_in_executor(None, ai_fact_check, text)
+            results["ai_fact_check"] = ai_result
+        except Exception as e:
+            logger.error(f"Error during AI fact checking: {e}")
+            results["ai_fact_check"] = "Ошибка AI-фактчекера: " + str(e)
+
         return results
 
     except Exception as e:
         logger.error(f"Unexpected error during text analysis: {e}")
-        # Return partial results with error
         results["error"] = str(e)
         return results
 
 def extract_key_claims(semantic_results: Dict[str, Any]) -> List[str]:
     """Extract key claims from semantic analysis for fact checking"""
-    # This would implement logic to identify the most important factual claims
-    # from the semantic analysis results
     claims = semantic_results.get("identified_claims", [])
-    # In case of error or no claims, still return an empty list
     return claims if isinstance(claims, list) else []
 
 def calculate_credibility_score(
@@ -139,14 +144,11 @@ def calculate_credibility_score(
     Calculate an overall credibility score based on all analysis results.
     Returns a score between 0 (likely fake) and 1 (likely credible).
     """
-    # This would implement a weighted scoring algorithm that combines
-    # various indicators from each analysis level
     statistical_score = statistical_results.get("credibility_score", 0.5)
     linguistic_score = linguistic_results.get("credibility_score", 0.5)
     semantic_score = semantic_results.get("credibility_score", 0.5)
     structural_score = structural_results.get("credibility_score", 0.5)
 
-    # Simple weighted average as an example
     weights = [0.25, 0.3, 0.3, 0.15]  # Adjust based on importance
     overall_score = sum([
         statistical_score * weights[0],
@@ -154,7 +156,6 @@ def calculate_credibility_score(
         semantic_score * weights[2],
         structural_score * weights[3]
     ])
-
     return overall_score
 
 def identify_suspicious_fragments(
@@ -166,24 +167,13 @@ def identify_suspicious_fragments(
 ) -> List[Dict[str, Any]]:
     """
     Identify suspicious text fragments based on analysis results.
-
-    Returns:
-        List of dictionaries containing information about suspicious fragments:
-        - start: Index where the fragment starts
-        - end: Index where the fragment ends
-        - text: The fragment text
-        - reason: Why it was flagged as suspicious
-        - confidence: Confidence level of the suspicion
     """
-    # This would implement logic to mark specific text fragments as suspicious
     suspicious_fragments = []
 
-    # Example: Add fragments from linguistic analysis
     linguistic_fragments = linguistic_results.get("suspicious_fragments", [])
     if isinstance(linguistic_fragments, list):
         suspicious_fragments.extend(linguistic_fragments)
 
-    # Example: Add fragments from semantic analysis
     semantic_fragments = semantic_results.get("suspicious_fragments", [])
     if isinstance(semantic_fragments, list):
         suspicious_fragments.extend(semantic_fragments)

@@ -1,34 +1,23 @@
-# Web-фреймворк и асинхронное программирование
 fastapi==0.109.2
 uvicorn==0.27.1
 aiohttp==3.9.3
-asyncio==3.4.3
 asyncpg==0.29.0
 python-dotenv==1.0.1
-pydantic==2.5.3  # Понижаем версию для совместимости с aiogram
-
-# Работа с данными и файлами
+pydantic==2.5.3
 pyyaml==6.0.1
 python-multipart==0.0.7
 
-# Обработка естественного языка
 nltk==3.8.1
-spacy==3.7.2
+spacy==3.8.0
 dostoevsky==0.6.0
 numpy==1.26.2
 pandas==2.1.4
 
-# Визуализация
 matplotlib==3.8.2
 seaborn==0.13.1
 pillow==10.2.0
 
-# Telegram API
 python-telegram-bot==20.7
 aiogram==3.3.0
 
-# Мониторинг и логирование
 psutil==5.9.8
-
-# Русская модель для spaCy (устанавливается отдельно)
-# python -m spacy download ru_core_news_md

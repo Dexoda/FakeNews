@@ -1,4 +1,3 @@
-cat > semantic_fixed.py << 'EOF'
 import logging
 import re
 from typing import Dict, Any, List, Tuple, Set
@@ -23,7 +22,7 @@ def load_spacy_model():
     if nlp is None:
         try:
             import spacy
-            nlp = spacy.load("ru_core_news_md")
+            nlp = spacy.load("/usr/local/lib/python3.11/site-packages/ru_core_news_md")
             logger.info("Модель spaCy успешно загружена")
         except Exception as e:
             logger.error(f"Ошибка при загрузке модели spaCy: {e}")
@@ -243,4 +242,3 @@ def extract_simple_claims(text: str) -> List[str]:
             claims.append(claim)
     
     return claims
-EOF
